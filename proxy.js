@@ -17,19 +17,19 @@ var listener = net.createServer(function(socket) {
       }
     }
     var hostPort = hostLine.split(':');
-    hostName = hostPort[1];
+    hostName = hostPort[1].trim();
     var uriPort = firstLine.split(':');
     if (hostPort.length > 2) {
-      port = hostPort[2];
+      port = hostPort[2].trim();
     }
     else if (port == null && /:[\d]+/.test(firstLine)) {
       // Look on uri line for a port
         port = uriPort.match(/:[\d]+/)
         port = port.substring(1, port.length);
     } else {
-      console.log('firstLine: ' + firstLine);
+      //console.log('firstLine: ' + firstLine);
       var protocol = firstLine.split(' ')[1].match(/^http[s]?:/);
-      console.log('protocol: ' + protocol);
+      //console.log('protocol: ' + protocol);
       if (protocol == 'http:') {
         port = '80';
       } else {
@@ -49,7 +49,6 @@ function modifyRequest(msg) {
   var modString = string.replace(/Proxy-connection: keep-alive/gi, 'Proxy-connection: close');
   modString = modString.replace(/Connection: keep-alive/gi, 'Connection: close');
   modString = modString.replace(/ HTTP\/[12].[10]/, ' HTTP/1.0');
-  console.log('Modified request: ' + modString);
   return new Buffer(modString);
 }
 
@@ -57,25 +56,26 @@ function forwardMessage(hostName, port, message) {
   // Create a client connection to send to the server
   var socket = new net.Socket();
   var hostIp;
-  dns.resolve4('www.google.com', function(err, addresses) {
+  console.log("hostname:" + hostName);
+  dns.resolve4(hostName, function(err, addresses) {
+    console.log(err);
     if (!err && addresses.length > 0) {
       hostIp = addresses[0];
-      console.log('addresses: ' + JSON.stringify(addresses));
     } else {
-      console.log('error');
       exit();
     }
-    console.log('port: ' + port);
-    console.log('hostIp: ' + hostIp);
+    //console.log('port: ' + port);
+    //console.log('hostIp: ' + hostIp);
     socket.connect(parseInt(port), hostIp, function() {
-      console.log('writing to socket: ' + message);
+      console.log('connected to ' + hostIp + ":" + port + "\n");
+      console.log('writing to socket: \n' + message + "\n");
       socket.write(message);
     });
     socket.on("data", function(data) {
-      console.log('data from server: ' + data);
+      console.log('data from server:\n ' + data.toString().substring(0, 100) + "\n");
       console.log('Server logic here');
     });
   });
 }
 
-listener.listen(1520);
+listener.listen(1521);
