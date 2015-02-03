@@ -37,7 +37,7 @@ var listener = net.createServer(function(socket) {
       }
     }
     console.log('host: ' + hostName + ", port: " + port);
-    forwardMessage(hostName, port, modifiedString);
+    forwardMessage(hostName, port, modifiedString, socket);
   });
   socket.on('connect', function(msg) {
     console.log('msg: ' + msg);
@@ -52,7 +52,7 @@ function modifyRequest(msg) {
   return new Buffer(modString);
 }
 
-function forwardMessage(hostName, port, message) {
+function forwardMessage(hostName, port, message, clientSocket) {
   // Create a client connection to send to the server
   var socket = new net.Socket();
   var hostIp;
@@ -66,14 +66,14 @@ function forwardMessage(hostName, port, message) {
     }
     //console.log('port: ' + port);
     //console.log('hostIp: ' + hostIp);
-    socket.connect(parseInt(port), hostIp, function() {
+    socket.connect(parseInt(port), hostName, function() {
       console.log('connected to ' + hostIp + ":" + port + "\n");
       console.log('writing to socket: \n' + message + "\n");
       socket.write(message);
     });
     socket.on("data", function(data) {
-      console.log('data from server:\n ' + data.toString().substring(0, 100) + "\n");
-      console.log('Server logic here');
+      console.log('data from server:\n ' + data.toString().substring(0, 500) + "\n");
+      clientSocket.write(data);
     });
   });
 }
