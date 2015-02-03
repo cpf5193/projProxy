@@ -22,7 +22,7 @@ var listener = net.createServer(function(socket) {
     if (hostPort.length > 2) {
       port = hostPort[2].trim();
     }
-    else if (port == null && /:[\d]+/.test(firstLine)) {
+    else if (port == null && uriPort.length > 1 && /:[\d]+$/.test(firstLine) == true) {
       // Look on uri line for a port
         port = uriPort.match(/:[\d]+/)
         port = port.substring(1, port.length);
@@ -40,7 +40,8 @@ var listener = net.createServer(function(socket) {
     forwardMessage(hostName, port, modifiedString, socket);
   });
   socket.on('connect', function(msg) {
-    console.log('msg: ' + msg);
+    //console.log('msg: ' + msg);
+    console.log('connect message');
   });
 });
 
@@ -56,15 +57,22 @@ function forwardMessage(hostName, port, message, clientSocket) {
   // Create a client connection to send to the server
   var socket = new net.Socket();
   var hostIp;
-  console.log("hostname:" + hostName);
   socket.connect(parseInt(port), hostName, function() {
-    console.log('connected to ' + hostIp + ":" + port + "\n");
-    console.log('writing to socket: \n' + message + "\n");
-    socket.write(message);
+    //console.log('connected to ' + hostIp + ":" + port + "\n");
+    //console.log('writing to socket: \n' + message + "\n");
+    try {
+      socket.write(message);
+    } catch (ex) {
+      console.log(ex);
+    }
   });
   socket.on("data", function(data) {
-    console.log('data from server:\n ' + data.toString().substring(0, 500) + "\n");
-    clientSocket.write(data);
+    //console.log('data from server:\n ' + data.toString().substring(0, 500) + "\n");
+    try {
+      clientSocket.write(data);
+    } catch (ex) {
+      console.log(ex);
+    }
   });
 }
 
