@@ -57,24 +57,14 @@ function forwardMessage(hostName, port, message, clientSocket) {
   var socket = new net.Socket();
   var hostIp;
   console.log("hostname:" + hostName);
-  dns.resolve4(hostName, function(err, addresses) {
-    console.log(err);
-    if (!err && addresses.length > 0) {
-      hostIp = addresses[0];
-    } else {
-      exit();
-    }
-    //console.log('port: ' + port);
-    //console.log('hostIp: ' + hostIp);
-    socket.connect(parseInt(port), hostName, function() {
-      console.log('connected to ' + hostIp + ":" + port + "\n");
-      console.log('writing to socket: \n' + message + "\n");
-      socket.write(message);
-    });
-    socket.on("data", function(data) {
-      console.log('data from server:\n ' + data.toString().substring(0, 500) + "\n");
-      clientSocket.write(data);
-    });
+  socket.connect(parseInt(port), hostName, function() {
+    console.log('connected to ' + hostIp + ":" + port + "\n");
+    console.log('writing to socket: \n' + message + "\n");
+    socket.write(message);
+  });
+  socket.on("data", function(data) {
+    console.log('data from server:\n ' + data.toString().substring(0, 500) + "\n");
+    clientSocket.write(data);
   });
 }
 
