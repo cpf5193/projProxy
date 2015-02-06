@@ -63,8 +63,8 @@ function forwardMessage(hostName, port, message, clientSocket) {
   var socket = new net.Socket({allowHalfOpen: true});
   try {
     socket.connect(parseInt(port), hostName, function() {
-      util.log('connected to ' + hostName + ":" + port + "\n");
-      util.log('writing to socket: \n' + message + "\n");
+      util.log('Forwarding message to ' + hostName + ":" + port + "\n");
+      //util.log('writing to socket: \n' + message + "\n");
       try {
         socket.write(message);
       } catch (ex) {
@@ -77,7 +77,7 @@ function forwardMessage(hostName, port, message, clientSocket) {
   }
   
   socket.on("data", function(data) {
-    util.log('data from server:\n ' + data.toString().substring(0, 1000) + "\n");
+    //util.log('data from server:\n ' + data.toString().substring(0, 1000) + "\n");
     try {
       clientSocket.write(data);
     } catch (ex) {
@@ -99,19 +99,22 @@ function forwardMessage(hostName, port, message, clientSocket) {
 function createTunnel(hostname, port, msg, clientSocket) {
   console.log('creating tunnel');
   var socket = new net.Socket({allowHalfOpen: true});
+  var clientId = getSocketNameAndPort(clientSocket);
   
   try {
     socket.connect(parseInt(port), hostName, function() {
       // Send success message
-      clientSocket.write(new Buffer('HTTP/1.0 200 OK'));
+      clientSocket.write(new Buffer('HTTP/1.0 200 OK\n\n'));
       console.log('connected tunnel to ' + hostName + ":" + port);
-      util.log('writing to socket: \n' + msg + "\n");
-      tunnels[hostname + ':' + port] = socket;//new socket for tunnel
+      //util.log('writing to client socket: \n' + msg + "\n");
+      //util.log("Creating tunnel for " + getSocketNameAndPort(clientSocket));
+      tunnels[clientId] = socket;//new socket for tunnel
     });
   } catch (ex) {
     console.log(ex);
-    clientSocket.write(new Buffer('HTTP/1.0 502 Bad Gateway'));
+    clientSocket.write(new Buffer('HTTP/1.0 502 Bad Gateway\n\n'));
   }
+  
   socket.on("data", function(data) {
     util.log('data from tunnel:\n ' + data.toString().substring(0, 500) + "\n");
     try {
@@ -120,16 +123,26 @@ function createTunnel(hostname, port, msg, clientSocket) {
       util.log('error writing to server: ' + ex);
     }
   });
+
   socket.on('end', function() {
     util.log('server ended');
     socket.end();
+    delete tunnels[clientId];
     // TODO: Send end to client
   });
   socket.on('close', function() {
     util.log('server closed');
     socket.destroy();
+    delete tunnels[clientId];
     // TODO: Send close to client
   });
+}
+
+function handleTunnel(clientId, msg) {
+  var serverSocket = tunnels[clientId];
+  //console.log("POST-CONNECT " + clientId + " + writing: \n");
+  //console.log(msg.toString());
+  serverSocket.write(msg);
 }
 
 /////////////////////////////////////////////////////////////
@@ -139,11 +152,19 @@ function createTunnel(hostname, port, msg, clientSocket) {
 // msg: the Buffer object containing the client's request
 /////////////////////////////////////////////////////////////
 function handleClientData(clientSocket, msg) {
+  var clientId = getSocketNameAndPort(clientSocket);
+  //util.log("Data from " + clientId);
+  //util.log("Tunnels: " + JSON.stringify(Object.keys(tunnels)));
+  var test = tunnels[clientId];
+  if(tunnels[clientId] !== undefined) {
+    handleTunnel(clientId, msg);
+    return;
+  }
   var string = msg.toString();
   var lines = string.split(/\r[\n]?/);
   var firstLine = lines[0];
   var firstLineTokens = firstLine.split(" ");
-  util.log('<<< ' + firstLineTokens[0] + " " + firstLineTokens[1]);
+  //util.log('>>> ' + firstLineTokens[0] + " " + firstLineTokens[1]);
   var hostAndPort = getHostAndPort(lines);
 
   // TODO: Need to determine how the proxy knows that it needs to send a message
@@ -151,11 +172,7 @@ function handleClientData(clientSocket, msg) {
   // Only one connect is ever honored by the proxy
   // Is it all subsequent requests to a certain server and port? if so, how do 
   // we keep track of the tunnels we have open? what is each tunnel socket listening to?
-  if (hostAndPort['id'] in tunnels) {
-    console.log('already in tunnel');
-    var data = stripData(string);
-    tunnels[hostAndPort].write(new Buffer(data));
-  } else if (firstLineTokens[0] == 'CONNECT') {
+  if (firstLineTokens[0] == 'CONNECT') {
     createTunnel(hostAndPort['hostName'], hostAndPort['port'], msg, clientSocket);
   } else {
     console.log('regular message');
@@ -198,9 +215,9 @@ function getHostAndPort(lines) {
       port = uriPort.match(/:[\d]+/);
       port = port.substring(1, port.length);
   } else {
-    util.log('firstLine: ' + firstLine);
+    //util.log('firstLine: ' + firstLine);
     var protocol = firstLineTokens[1].match(/^http[s]?:/);
-    util.log('protocol: ' + protocol);
+    //util.log('protocol: ' + protocol);
     if (protocol == 'http:') {
       port = '80';
     } else {
@@ -212,6 +229,10 @@ function getHostAndPort(lines) {
   hostAndPort['port'] = parseInt(port);
   hostAndPort['id'] = hostName + ":" + port;
   return hostAndPort;
+}
+
+function getSocketNameAndPort(s) {
+  return s.remoteAddress + ":" + s.remotePort;
 }
 
 ///////////////////////////////////////////////////
