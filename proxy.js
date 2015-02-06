@@ -24,8 +24,9 @@ var listener = net.createServer({allowHalfOpen: true}, function(socket) {
     handleClientData(socket, msg);
   });
   socket.on('end', function() {
-    // util.log('client disconnected');
+    util.log('client disconnected');
     // TODO: send the ending signal to the server
+    socket.push(null);
     socket.end();
   });
   socket.setTimeout(600000);
@@ -62,8 +63,8 @@ function forwardMessage(hostName, port, message, clientSocket) {
   var socket = new net.Socket({allowHalfOpen: true});
   try {
     socket.connect(parseInt(port), hostName, function() {
-      //util.log('connected to ' + hostIp + ":" + port + "\n");
-      //util.log('writing to socket: \n' + message + "\n");
+      util.log('connected to ' + hostName + ":" + port + "\n");
+      util.log('writing to socket: \n' + message + "\n");
       try {
         socket.write(message);
       } catch (ex) {
@@ -76,7 +77,7 @@ function forwardMessage(hostName, port, message, clientSocket) {
   }
   
   socket.on("data", function(data) {
-    //util.log('data from server:\n ' + data.toString().substring(0, 500) + "\n");
+    util.log('data from server:\n ' + data.toString().substring(0, 1000) + "\n");
     try {
       clientSocket.write(data);
     } catch (ex) {
@@ -84,12 +85,12 @@ function forwardMessage(hostName, port, message, clientSocket) {
     }
   });
   socket.on('end', function() {
-    // util.log('server ended');
+    util.log('server ended');
     socket.end();
     // TODO: Send end to client
   });
   socket.on('close', function() {
-    // util.log('server closed');
+    util.log('server closed');
     socket.destroy();
     // TODO: Send close to client
   });
@@ -104,6 +105,7 @@ function createTunnel(hostname, port, msg, clientSocket) {
       // Send success message
       clientSocket.write(new Buffer('HTTP/1.0 200 OK'));
       console.log('connected tunnel to ' + hostName + ":" + port);
+      util.log('writing to socket: \n' + msg + "\n");
       tunnels[hostname + ':' + port] = socket;//new socket for tunnel
     });
   } catch (ex) {
@@ -119,12 +121,12 @@ function createTunnel(hostname, port, msg, clientSocket) {
     }
   });
   socket.on('end', function() {
-    // util.log('server ended');
+    util.log('server ended');
     socket.end();
     // TODO: Send end to client
   });
   socket.on('close', function() {
-    // util.log('server closed');
+    util.log('server closed');
     socket.destroy();
     // TODO: Send close to client
   });
@@ -196,9 +198,9 @@ function getHostAndPort(lines) {
       port = uriPort.match(/:[\d]+/);
       port = port.substring(1, port.length);
   } else {
-    //util.log('firstLine: ' + firstLine);
+    util.log('firstLine: ' + firstLine);
     var protocol = firstLineTokens[1].match(/^http[s]?:/);
-    //util.log('protocol: ' + protocol);
+    util.log('protocol: ' + protocol);
     if (protocol == 'http:') {
       port = '80';
     } else {
@@ -211,6 +213,19 @@ function getHostAndPort(lines) {
   hostAndPort['id'] = hostName + ":" + port;
   return hostAndPort;
 }
+
+///////////////////////////////////////////////////
+// Listen for CTRL-C or EOF to terminate
+///////////////////////////////////////////////////
+
+//NOTE: Reading stdin is not supported in Cygwin
+/*process.stdin.on('end', function() {
+  process.exit(0);
+});
+*/
+process.on('SIGINT', function() {
+  process.exit(0);
+});
 
 ///////////////////////////////////////////////////
 // Start Proxy
