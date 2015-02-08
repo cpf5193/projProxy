@@ -1,3 +1,19 @@
+/*
+Chip Fukuhara (cpf5193)
+Jacob Gile (jjgile)
+Zahorjan
+CSE 461
+9 February 2015
+Project 2
+
+
+Proxy.js provides an HTTP proxy that accepts client HTTP requests
+and forwards them to the host specified in that request.
+
+HTTP CONNECT requests are treated specially so that the requesting
+client has a TCP connection with its requested host.
+*/
+
 var net = require('net');
 var dns = require('dns');
 var util = require('util');
@@ -90,7 +106,14 @@ function forwardMessage(hostName, port, message, clientSocket) {
   });
 }
 
-function createTunnel(hostname, port, msg, clientSocket) {
+/////////////////////////////////////////////////////////////
+// Specifies a TCP tunnel between a client that has
+// sent a CONNECT request and the host it has requested
+// hostname: Remote host the client wishes to connect to
+// port: Port of the remote host (usually 80 or 443)
+// clientSocket: socket that is initiated the request
+/////////////////////////////////////////////////////////////
+function createTunnel(hostname, port, clientSocket) {
   var socket = new net.Socket({allowHalfOpen: true});
   var clientId = getSocketNameAndPort(clientSocket);
   
@@ -126,6 +149,13 @@ function createTunnel(hostname, port, msg, clientSocket) {
   });
 }
 
+/////////////////////////////////////////////////////////////
+// Forwards a message from a client that is part of an
+// existing tunnel
+// clientId: hostname and port of client, uniquely idntifies 
+//   the tunenl
+// msg; data to be forward through the tunnel
+///////////////////////////////////////////////////////////// 
 function handleTunnel(clientId, msg) {
   var serverSocket = tunnels[clientId];
   serverSocket.write(msg);
@@ -157,7 +187,7 @@ function handleClientData(clientSocket, msg) {
   // shut down, ignore it
   if (hostAndPort != undefined) {
     if (firstLineTokens[0] == 'CONNECT') {
-      createTunnel(hostAndPort['hostName'], hostAndPort['port'], msg, clientSocket);
+      createTunnel(hostAndPort['hostName'], hostAndPort['port'], clientSocket);
     } else {
       var modifiedBuffer = modifyRequest(msg);
       forwardMessage(hostAndPort['hostName'], hostAndPort['port'], modifiedBuffer, clientSocket);
@@ -224,11 +254,11 @@ function getSocketNameAndPort(s) {
 // Listen for CTRL-C or EOF to terminate
 ///////////////////////////////////////////////////
 
-//NOTE: Reading stdin is not supported in Cygwin
-/*process.stdin.on('end', function() {
+//NOTE: Reading stdin is not fully supported in node.js on Cygwin
+process.stdin.on('end', function() {
   process.exit(0);
 });
-*/
+
 process.on('SIGINT', function() {
   process.exit(0);
 });
@@ -238,3 +268,5 @@ process.on('SIGINT', function() {
 ///////////////////////////////////////////////////
 listener.listen(parseInt(PORT), HOST, 5);
 util.log('Proxy listening on ' + HOST + ":" + PORT);
+
+process.stdin.resume();

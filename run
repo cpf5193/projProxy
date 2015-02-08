@@ -1,2 +1,2 @@
 #!/bin/bash
-node proxy.js localhost $1
+node proxy.js $HOSTNAME $1
