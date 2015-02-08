@@ -84,14 +84,16 @@ function forwardMessage(hostName, port, message, clientSocket) {
   socket.on('end', function() {
     util.log('server ended');
     socket.end();
+    clientSocket.end();
     // TODO: Send end to client
   });
   socket.on('error', function(err) {
-    console.log('caught error in forwardMessage: ' + err);
+    console.log(err);
   });
   socket.on('close', function() {
     util.log('server closed');
-    socket.destroy();
+    socket.end();
+    clientSocket.end();
     // TODO: Send close to client
   });
 }
@@ -114,9 +116,8 @@ function createTunnel(hostname, port, msg, clientSocket) {
     console.log(ex);
     clientSocket.write(new Buffer('HTTP/1.0 502 Bad Gateway\n\n'));
   }
-  
   socket.on("error", function (err) {
-    console.log("caught error: " + err);
+    console.log(err);
   });
   socket.on("data", function(data) {
     //util.log('data from tunnel:\n ' + data.toString().substring(0, 500) + "\n");
@@ -129,13 +130,15 @@ function createTunnel(hostname, port, msg, clientSocket) {
 
   socket.on('end', function() {
     util.log('server ended');
-    //socket.end();
-    //delete tunnels[clientId];
+    socket.end();
+    clientSocket.end();
+    delete tunnels[clientId];
     // TODO: Send end to client
   });
   socket.on('close', function() {
     util.log('server closed');
     socket.end();
+    clientSocket.end();
     delete tunnels[clientId];
     // TODO: Send close to client
   });
