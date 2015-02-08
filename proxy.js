@@ -26,11 +26,11 @@ var listener = net.createServer({allowHalfOpen: true}, function(socket) {
   socket.on('end', function() {
     util.log('client disconnected');
     // TODO: send the ending signal to the server
-    socket.push(null);
     socket.end();
   });
   socket.on('error', function(err) {
-    console.log(err);
+    console.log('listener: ' + err);
+    socket.end();
   });
 });
 
@@ -57,7 +57,7 @@ function modifyRequest(msg) {
 /////////////////////////////////////////////////////////////
 function forwardMessage(hostName, port, message, clientSocket) {
   // Create a client connection to send to the server
-  var socket = new net.Socket({allowHalfOpen: true});
+  var socket = new net.Socket();
   try {
     socket.connect(parseInt(port), hostName, function() {
       util.log('Forwarding message to ' + hostName + ":" + port + "\n");
@@ -88,7 +88,7 @@ function forwardMessage(hostName, port, message, clientSocket) {
     // TODO: Send end to client
   });
   socket.on('error', function(err) {
-    console.log(err);
+    console.log('forward message: ' + err);
   });
   socket.on('close', function() {
     util.log('server closed');
@@ -100,7 +100,7 @@ function forwardMessage(hostName, port, message, clientSocket) {
 
 function createTunnel(hostname, port, msg, clientSocket) {
   console.log('creating tunnel');
-  var socket = new net.Socket({allowHalfOpen: true});
+  var socket = new net.Socket();
   var clientId = getSocketNameAndPort(clientSocket);
   
   try {
@@ -117,7 +117,7 @@ function createTunnel(hostname, port, msg, clientSocket) {
     clientSocket.write(new Buffer('HTTP/1.0 502 Bad Gateway\n\n'));
   }
   socket.on("error", function (err) {
-    console.log(err);
+    console.log('create tunnel: ' + err);
   });
   socket.on("data", function(data) {
     //util.log('data from tunnel:\n ' + data.toString().substring(0, 500) + "\n");
@@ -127,7 +127,6 @@ function createTunnel(hostname, port, msg, clientSocket) {
       util.log('error writing to server: ' + ex);
     }
   });
-
   socket.on('end', function() {
     util.log('server ended');
     socket.end();
@@ -178,12 +177,18 @@ function handleClientData(clientSocket, msg) {
   // Only one connect is ever honored by the proxy
   // Is it all subsequent requests to a certain server and port? if so, how do 
   // we keep track of the tunnels we have open? what is each tunnel socket listening to?
-  if (firstLineTokens[0] == 'CONNECT') {
-    createTunnel(hostAndPort['hostName'], hostAndPort['port'], msg, clientSocket);
-  } else {
-    console.log('regular message');
-    var modifiedBuffer = modifyRequest(msg);
-    forwardMessage(hostAndPort['hostName'], hostAndPort['port'], modifiedBuffer, clientSocket);
+  
+  // If there is no host and port, and there is no registered tunnel,
+  // we know that the message is a lagging request to a tunnel that has been
+  // shut down, ignore it
+  if (hostAndPort !== undefined) {
+    if (firstLineTokens[0] == 'CONNECT') {
+      createTunnel(hostAndPort['hostName'], hostAndPort['port'], msg, clientSocket);
+    } else {
+      console.log('regular message');
+      var modifiedBuffer = modifyRequest(msg);
+      forwardMessage(hostAndPort['hostName'], hostAndPort['port'], modifiedBuffer, clientSocket);
+    }
   }
 }
 
@@ -209,6 +214,9 @@ function getHostAndPort(lines) {
     if (/^host:*/i.test(lines[i])) {
       hostLine = lines[i];
     }
+  }
+  if (hostLine == undefined) {
+    return null;
   }
   var hostPort = hostLine.split(':');
   hostName = hostPort[1].trim();
