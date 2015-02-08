@@ -29,12 +29,9 @@ var listener = net.createServer({allowHalfOpen: true}, function(socket) {
     socket.push(null);
     socket.end();
   });
-  socket.setTimeout(600000);
-  socket.on('timeout', function() {
-    util.log('client timed out.');
-    // TODO: send the ending signal to the server
-    socket.end();
-  })
+  socket.on('error', function(err) {
+    console.log(err);
+  });
 });
 
 ////////////////////////////////////////////////////////////
@@ -89,6 +86,9 @@ function forwardMessage(hostName, port, message, clientSocket) {
     socket.end();
     // TODO: Send end to client
   });
+  socket.on('error', function(err) {
+    console.log('caught error in forwardMessage: ' + err);
+  });
   socket.on('close', function() {
     util.log('server closed');
     socket.destroy();
@@ -115,8 +115,11 @@ function createTunnel(hostname, port, msg, clientSocket) {
     clientSocket.write(new Buffer('HTTP/1.0 502 Bad Gateway\n\n'));
   }
   
+  socket.on("error", function (err) {
+    console.log("caught error: " + err);
+  });
   socket.on("data", function(data) {
-    util.log('data from tunnel:\n ' + data.toString().substring(0, 500) + "\n");
+    //util.log('data from tunnel:\n ' + data.toString().substring(0, 500) + "\n");
     try {
       clientSocket.write(data);
     } catch (ex) {
@@ -126,13 +129,13 @@ function createTunnel(hostname, port, msg, clientSocket) {
 
   socket.on('end', function() {
     util.log('server ended');
-    socket.end();
-    delete tunnels[clientId];
+    //socket.end();
+    //delete tunnels[clientId];
     // TODO: Send end to client
   });
   socket.on('close', function() {
     util.log('server closed');
-    socket.destroy();
+    socket.end();
     delete tunnels[clientId];
     // TODO: Send close to client
   });
